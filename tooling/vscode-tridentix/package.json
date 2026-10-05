@@ -1,0 +1,28 @@
+{
+  "name": "tridentix-language",
+  "displayName": "Tridentix Language Support",
+  "description": "Syntax highlighting for the Tridentix programming language (.trix files)",
+  "version": "0.1.0",
+  "icon": "icon.png",
+  "engines": {
+    "vscode": "^1.60.0"
+  },
+  "categories": ["Programming Languages"],
+  "contributes": {
+    "languages": [
+      {
+        "id": "tridentix",
+        "aliases": ["Tridentix", "tridentix"],
+        "extensions": [".trix"],
+        "configuration": "./language-configuration.json"
+      }
+    ],
+    "grammars": [
+      {
+        "language": "tridentix",
+        "scopeName": "source.trix",
+        "path": "./syntaxes/tridentix.tmLanguage.json"
+      }
+    ]
+  }
+}

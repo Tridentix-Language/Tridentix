@@ -1,0 +1,70 @@
+[workspace]
+resolver = "2"
+members = ["actor_rt"]
+
+[package]
+name = "tridentix"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+name = "tridentix"
+crate-type = ["rlib"]
+
+# Two binary names from the same entry point: `tridentix` is the full
+# name, `trix` is the short CLI alias. Both explicit so neither depends
+# on Cargo's package-name-derived default (which would only ever produce
+# one binary, named after [package].name, from src/main.rs).
+# src/bin/*.rs files (pkg.rs, tridentix-lsp.rs) remain auto-discovered
+# as before under their own filenames — no change needed there.
+[[bin]]
+name = "tridentix"
+path = "src/main.rs"
+
+[[bin]]
+name = "trix"
+path = "src/main.rs"
+
+[dependencies]
+inkwell = { version = "0.10", features = ["llvm22-1", "llvm22-1-prefer-dynamic"] }
+regex = "1"
+serde_json = "1"
+toml = "0.7"
+indexmap = "=2.2.6"
+tower-lsp = "0.19"
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+# Module 1, Part C: the native actor runtime. Depended on NORMALLY (not
+# statically embedded via a build.rs + --whole-archive hack, which was
+# tried and reverted — it duplicated Rust's std/core symbols and broke
+# linking). Instead, `codegen.rs` calls `inkwell`'s
+# `ExecutionEngine::add_global_mapping()` to bind the JIT-declared
+# `extern "C"` functions directly to these REAL function pointers at
+# runtime — the standard, correct way to give an in-process JIT access
+# to host functions, with no linker tricks needed. AOT-compiled
+# standalone binaries instead link against `actor_rt`'s OWN separate
+# static lib (see `actor_rt/Cargo.toml`), since they have no running
+# host process to borrow function pointers from.
+tridentix-actor-rt = { path = "actor_rt" }
+
+# --- Temporary toolchain-compat pins (baseline testing only) ---
+# This authoring sandbox only has Rust 1.75 (apt), no network access to
+# rustup for the newer toolchain (1.89+) this project's README says it
+# actually needs for the tower-lsp/tokio dependency tree. These pins hold
+# several transitive dependencies below the version where they started
+# requiring either Cargo's edition2024 feature or a rust-version floor
+# above 1.75 (both stabilized well after 1.75), so a baseline
+# `cargo check` is possible here at all. NOT meant to be a permanent
+# part of the manifest — see the accompanying summary for the real
+# recommendation (build with Rust 1.89+ as the README already states).
+# Using inline tables (not `[dependencies.x]` section headers) specifically
+# so each pin is self-contained on one line and can never accidentally
+# capture a later line as one of its own keys.
+icu_normalizer = "=1.5.0"
+idna_adapter = "=1.1.0"
+litemap = "=0.7.3"
+tinystr = "=0.7.6"
+url = "=2.4.1"
+yoke = "=0.7.5"

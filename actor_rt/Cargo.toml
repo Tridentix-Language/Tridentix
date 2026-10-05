@@ -1,0 +1,9 @@
+[package]
+name = "tridentix-actor-rt"
+version = "0.1.0"
+edition = "2021"
+description = "Tiny LLVM-independent native actor runtime (C ABI) for Tridentix AOT/JIT"
+
+[lib]
+name = "tridentix_actor_rt"
+crate-type = ["rlib", "staticlib"]
