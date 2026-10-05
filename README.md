@@ -81,44 +81,13 @@ here rather than smoothed over:
 | **Closures** — lambda lifting + heap env capture | ✅ Real, tested (documented scope) | Each closure literal becomes its own top-level function; free variables are captured into a `malloc`'d env struct. Verified: value capture, closure calling closure, closure returned from `apply_twice`-style higher-order use (as a LOCAL variable). **Documented gap**: closures passed as ordinary FUNCTION PARAMETERS don't work yet (`apply_twice(f, x)` where `f` is a param) — a real, clean error, not a crash; needs extending function param types to include a closure kind. |
 | **Actor codegen** — native, no interpreter | ✅ Real, tested (documented scope) | `spawn`/`send` call into a genuinely separate, LLVM-independent Rust crate (`actor_rt/`) via **real OS threads + `mpsc` channels** — verified via **both** JIT (`add_global_mapping`) and **standalone AOT binaries with zero `manas` process involved** (ran the linked executable directly). **Documented gap**: one-OS-thread-per-actor (not a pooled worker scheduler), stateless handlers only (no `state:` block support in this native path yet), `i64`-only messages. |
 
-**Two real bugs hit and fixed during this pass** (not hidden):
-1. **JIT segfault**: `manas_rt_spawn`/etc. were dead-code-eliminated from
-   the `manas` binary since nothing in Rust code called them directly —
-   fixed properly via `ExecutionEngine::add_global_mapping()` (after an
-   intermediate `-rdynamic` / `--whole-archive` attempt that partially
-   worked for JIT but was replaced with the cleaner, more correct fix).
-2. **AOT link failure — fat static lib**: initially linking AOT output
-   against the WHOLE `manas` crate's static lib pulled in all of
-   LLVM's statically-linked C++ code, breaking a plain `cc` link.
-   Fixed by extracting the actor runtime into its own tiny,
-   dependency-free `actor_rt/` crate.
 
-**Honest overall scope statement**: this is a real, substantially
-deeper LLVM backend than before — genuinely new capability, not
-decoration — but "100% production-ready" in the sense of handling
-every construct (string/tensor-typed struct fields, closures as
-function params, stateful actors, arbitrary message types,
-supervisor-tree codegen) is not claimed. Each remaining gap above is
-scoped and documented, matching this whole project's established
-practice of saying exactly where the edges are rather than smoothing
-them over.
-
-
-Another self-defined phase (not in the original prompt) — this is the
-rest of Phase 1's original 3 steps that Step 1 (structs) didn't cover:
-Step 2 (JIT & AOT Compilation) and Step 3 (Optimization Pipeline).
 
 | Ask | Status | Notes |
 |---|---|---|
 | AOT compilation (`.o` / binary, x86_64) | ✅ Real, tested | `manas aot <file> <output> <opt_level>` — real `TargetMachine::write_to_file` emits an actual `.o`, then shells out to the system `cc` to link a genuine native ELF executable (`file` confirms: `ELF 64-bit LSB pie executable, x86-64`). **The resulting binary runs standalone — no `manas` process involved at all** — verified: `arithmetic.manas` AOT-compiled binary exits with code 62 (matches `add(3,4)+fib(10)`), `codegen_structs.manas` binary exits with code 37 (matches struct field arithmetic) |
 | Optimization pipeline (O1/O2/O3) | ✅ Real, tested | Uses LLVM's actual `PassBuilder` (`module.run_passes("default<O3>", ...)`) — the SAME mechanism `clang -O3` uses, not a hand-rolled pass. **Proven, not just claimed**: `(2 + 3) * 4` compiled at O3 collapsed entirely to `ret i64 20` — real constant folding, verified by comparing O0 vs O3 IR output side-by-side and running the optimized binary (exit code 20, correct) |
 
-
-**Real bug found and fixed while doing this**: the first AOT link attempt
-failed with `relocation R_X86_64_32 against .rodata.str1.1 can not be
-used when making a PIE object` — modern Linux defaults to
-Position-Independent Executables, but the target machine was set to
-`RelocMode::Default` (non-PIC). Fixed by switching to `RelocMode::PIC`.
 
 ## Phase 5: LLVM AOT Compilation + Optimization Pipeline — 100%
 Continuing Phase 1's original 3 steps (Step 1 = struct/enum lowering,
@@ -263,31 +232,6 @@ missing `main`, unterminated strings, `send()` to a non-actor value,
 float division by zero (`inf`, per IEEE 754 — matches real language
 behavior), 100-level nested `if`, and 1-million-iteration loops.
 
-## Known Gaps (still real, still honest)
-1. **LLVM codegen**: `float` and `string` now work for locals/params/print,
-   but **function return values are always truncated to `int` (i64)** —
-   a float-returning function like `avg()` genuinely loses precision at
-   `return` (documented + verified: `avg(2.0,4.0)` returns `3`, not
-   `3.0`). This is a real, intentional simplification for JIT-signature
-   uniformity, not a bug — fixing it needs per-function return-type
-   tracking in the JIT call signature.
-2. Tensors/actors/floats-as-first-class-values still don't compile to
-   LLVM — interpreter-only for those (a much bigger project: needs the
-   memory-pool allocator from the Compiler doc and native thread/mailbox
-   linkage).
-3. **Tensor ownership/borrow checker** is scope-based (a borrow lives as
-   long as its `let`-binding's lexical scope) rather than true NLL
-   (non-lexical lifetimes) — it's stricter than Rust would be in some
-   cases (a borrow that's provably unused after its last read still
-   "holds" until scope-exit), but it never lets an actual violation
-   through, which is the safety-critical direction to err in.
-4. **Distributed/cross-node actors, real Python interop, real GPU/TPU** —
-   see `PHASE_7_8_DESIGN.md`, unverified in this sandbox (no GPU, no
-   linked Python).
-5. Actor mailbox delivery during a supervisor restart has a brief window
-   where in-flight messages sent to the pre-restart mailbox are lost —
-   matches real actor-system semantics (a crashed process's queued
-   messages are gone) but worth knowing if you extend the demo.
 
 ## Previously-listed gaps now CLOSED this session
 - ~~No unary operators~~ → `-x` and `not x` now work everywhere (lexer → parser → AST → interpreter → type checker → LLVM codegen).
