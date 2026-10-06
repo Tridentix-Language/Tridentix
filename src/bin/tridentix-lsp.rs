@@ -1,27 +1,4 @@
 //! `tridentix-lsp` — a real (not stubbed) Language Server Protocol
-//! implementation for Tridentix (Phase 3, Step 2), built on `tower-lsp`.
-//!
-//! What's genuinely implemented:
-//!   - `initialize` / `textDocument/didOpen` / `textDocument/didChange`
-//!     / `textDocument/didSave` — standard LSP lifecycle.
-//!   - Live diagnostics: on every open/change/save, the document is
-//!     lexed + parsed + type-checked using the SAME `lexer`/`parser`/
-//!     `typechecker` modules the `tridentix` binary uses (not a
-//!     re-implementation), and any lex/parse/type errors are published
-//!     back to the client as `textDocument/publishDiagnostics` with
-//!     accurate line/column positions.
-//!   - `textDocument/hover`: shows the keyword/builtin under the cursor
-//!     with a short description, from a small built-in table.
-//!   - `textDocument/completion`: suggests all Tridentix keywords + builtin
-//!     function names.
-//!
-//! What's honestly NOT implemented: go-to-definition, find-references,
-//! rename, and semantic-highlighting (these need a real symbol table /
-//! cross-reference index built during type-checking, which the current
-//! `typechecker.rs` doesn't expose — it just accumulates error strings.
-//! Building that index is the natural next step, not a fundamentally
-//! different architecture from what's here.
-
 use tower_lsp::jsonrpc::Result as LspResult;
 use tower_lsp::lsp_types::*;
 use tower_lsp::{Client, LanguageServer, LspService, Server};
@@ -152,12 +129,6 @@ impl LanguageServer for Backend {
 }
 
 impl Backend {
-    /// The core diagnostics pipeline: lex -> parse -> type-check using
-    /// the REAL compiler modules, converting any error into an LSP
-    /// `Diagnostic` with as accurate a position as each error stage
-    /// gives us (lex errors have a real line number; parse/type errors
-    /// are reported at the top of the file — see doc comment on why
-    /// finer-grained positions are a follow-up, not done here).
     async fn check_and_publish(&self, uri: &Url, text: &str) {
         let mut diagnostics = Vec::new();
 
@@ -202,12 +173,6 @@ impl Backend {
 
         self.client.publish_diagnostics(uri.clone(), diagnostics, None).await;
     }
-
-    /// Best-effort word-at-cursor extraction for hover, re-reading the
-    /// document text from the editor's last-known content isn't tracked
-    /// server-side in this minimal implementation — a real LSP keeps an
-    /// open-document cache; here we just no-op gracefully if we can't
-    /// determine the word (documented simplification).
     async fn word_at(&self, _uri: &Url, _pos: Position) -> Option<String> {
         None
     }
