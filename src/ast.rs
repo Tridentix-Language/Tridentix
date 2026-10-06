@@ -1,9 +1,3 @@
-//! AST (Abstract Syntax Tree) definitions for the Tridentix MVP subset.
-//! Covers: fn, let, if/elif/else, loop (range-based), while, return,
-//! literals (int/float/string/bool), identifiers, binary expressions,
-//! and function calls (incl. the `print` builtin).
-
-#[derive(Debug, Clone, PartialEq)]
 pub enum BinOp {
     Add,
     Sub,
@@ -112,10 +106,6 @@ pub enum Stmt {
         index: Expr,
         value: Expr,
     },
-    /// `obj.field = value` — mutates a struct field IN PLACE (structs
-    /// are `Arc<Mutex<>>`-backed reference types, so this is a real
-    /// mutation visible to every other binding sharing the same struct,
-    /// not a copy-then-reassign).
     FieldAssign {
         base: Expr,
         field: String,
@@ -134,10 +124,6 @@ pub enum Stmt {
     Import(String),
     Actor {
         name: String,
-        /// `state: field: type = initial_expr` declarations, initialized
-        /// ONCE when the actor is spawned and persisting across
-        /// messages (see interpreter.rs's `run_actor_worker` doc
-        /// comment for how this maps onto the scope-stack model).
         state_vars: Vec<(String, Option<String>, Expr)>,
         param_name: String,
         param_type: Option<String>,
@@ -187,10 +173,6 @@ pub enum Stmt {
 }
 
 pub type Program = Vec<Stmt>;
-
-/// Small pretty-printer so the AST is human-readable in the terminal.
-/// This is what Phase 1's demo uses to prove the parser actually
-/// understood the source file, before any interpreter/codegen exists.
 pub fn print_program(program: &Program) {
     for stmt in program {
         print_stmt(stmt, 0);
