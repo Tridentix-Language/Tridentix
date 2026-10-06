@@ -7,14 +7,7 @@
 //!   pkg test                 — run every .trix file in tests/, report pass/fail
 //!   pkg deps                 — print the resolved dependency graph
 //!   pkg doc                  — generate Markdown docs from `##` doc-comments
-//!
-//! NOT implemented (documented honestly, not faked): `pkg publish` (needs
-//! a real package registry server, which doesn't exist for Tridentix yet —
-//! see this file's `cmd_publish` for what a real implementation would
-//! need), and real semver-range dependency resolution against a
-//! registry (this CLI only resolves LOCAL path dependencies listed in
-//! `project.toml`, which is honest groundwork for the real thing rather
-//! than a semver solver with nothing to solve against).
+
 
 use tridentix::{ast, interpreter, lexer, parser, typechecker};
 use serde::Deserialize;
@@ -45,14 +38,7 @@ fn default_entry() -> String {
 #[derive(Debug, Deserialize)]
 #[serde(untagged)]
 enum DependencySpec {
-    /// `foo = "1.2.0"` — a version REQUIREMENT. Real resolution against
-    /// a registry isn't implemented (no registry exists yet — see this
-    /// file's module doc comment), so this form is parsed and displayed
-    /// by `pkg deps` but not fetchable by `pkg build`.
-    Version(String),
-    /// `foo = { path = "../foo" }` — a local path dependency. This form
-    /// IS fully resolved and usable: `pkg build`/`pkg run` will parse
-    /// and type-check the dependency's own entry file too.
+   
     Path { path: String },
 }
 
@@ -223,13 +209,6 @@ fn resolve_imports(program: ast::Program, base_dir: &Path, visited: &mut std::co
     Ok(resolved)
 }
 
-/// `pkg test` — runs every `.trix` file directly under `tests/`. A file
-/// PASSES if it runs to completion without a type error or runtime
-/// error (`assert()` failures surface as a normal runtime error, so
-/// they count as a failure too). This is intentionally simple (no test
-/// framework DSL, no isolated per-test-function discovery within a
-/// file) — a real test runner would want per-`fn`-granularity discovery,
-/// documented as a follow-up.
 fn cmd_test() -> Result<(), String> {
     let tests_dir = Path::new("tests");
     if !tests_dir.exists() {
@@ -295,23 +274,9 @@ fn cmd_deps() -> Result<(), String> {
     }
     Ok(())
 }
-
-/// `pkg publish` — HONESTLY NOT IMPLEMENTED. A real implementation would
-/// need: (1) a registry server (HTTP API to upload/download package
-/// tarballs + a searchable index — itself a significant service to
-/// build and host), (2) an auth/account system, (3) a packaging format
-/// (tarball + checksum), (4) semver-range dependency resolution against
-/// that registry for `pkg build`. None of that exists for Tridentix. Faking
-/// a "successful publish" that goes nowhere would be actively
-/// misleading, so this just explains the gap instead.
 fn cmd_publish() -> Result<(), String> {
     Err("pkg publish isn't implemented — there is no Tridentix package registry to publish to yet (this needs a real hosted service, not just more CLI code; see this file's `cmd_publish` doc comment)".into())
 }
-
-/// `pkg doc` — extracts `##`-prefixed doc-comments immediately above
-/// `fn`/`struct`/`enum`/`actor` declarations and renders them as
-/// Markdown. Real (not templated placeholder) text extraction from
-/// actual source files.
 fn cmd_doc() -> Result<(), String> {
     let manifest = load_manifest()?;
     let entry = PathBuf::from(&manifest.package.entry);
